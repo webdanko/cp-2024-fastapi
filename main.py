@@ -1,6 +1,9 @@
 import overpass
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
 def get_overpass_api():
     api = overpass.API(endpoint="https://maps.mail.ru/osm/tools/overpass/api/interpreter")
@@ -25,9 +28,10 @@ def prepare_overpass_infrastructure(around, array):
 
 app = FastAPI()
 
-@app.get("/", response_class=PlainTextResponse)
+@app.get("/", response_class=HTMLResponse)
 async def root():
-    return "Timeweb Cloud + FastAPI = ❤️"
+    html_content = Path("html/index.html").read_text(encoding="utf-8")
+    return HTMLResponse(content=html_content)
 
 @app.get("/api/around/{lat}/{lon}/{radius}")
 def get_entity_list(lat: float, lon: float, radius: float):
