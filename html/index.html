@@ -1,37 +1,213 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Страница заглушка</title>
-    <style>
-        body {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background-color: #f0f0f0;
-            color: #333;
-        }
-        .container {
-            text-align: center;
-        }
-        h1 {
-            font-size: 2em;
-            margin-bottom: 0.5em;
-        }
-        p {
-            font-size: 1.2em;
-            color: #666;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Сайт в разработке</h1>
-        <p>Мы работаем над обновлением. Пожалуйста, зайдите позже.</p>
-    </div>
-</body>
+<!--
+Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+Click nbfs://nbhost/SystemFileSystem/Templates/Other/html.html to edit this template
+-->
+<html>
+    <head>
+        <title>Social gravity map</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+        <script src="//ajax.googleapis.com/ajax/libs/d3js/7.9.0/d3.min.js"></script>
+        <script src="//api-maps.yandex.ru/2.1/?apikey=705e5f90-e713-43d9-b15c-5c89b8ee55cb&lang=ru-RU"></script>
+        <style>
+            html, body {
+                margin: 0;
+                padding: 0;
+            }
+            .full-screen-container {
+                width:100%;
+                height: 100vh;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="full-screen-container">
+            <div id="map" style="width:100%; height: 100vh;"></div>
+        </div>
+        <script>
+            var mainMap = null;
+            var collections = {};
+            var buttons = {};
+            var hashes = [];
+            var colorIndex = 0;
+            var colors = [
+                '#a8e4a0',
+                '#FFA640',
+                '#E138AA',
+                '#9440D5',
+            ];
+            
+            function stringToHash(string) {
+                let hash = 0;
+                if (string.length == 0) return hash;
+
+                for (i = 0; i < string.length; i++) {
+                    char = string.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash;
+                }
+
+                return hash;
+            }
+
+            function initMap(){
+                mainMap = new ymaps.Map("map",
+                {
+                    center: [0, 0],
+                    zoom: 11,
+                    controls : [
+                      'typeSelector',
+                      'zoomControl',
+                      'rulerControl',
+                      'trafficControl',
+                    ]
+                },{
+                    maxZoom : 19
+                });
+                var fullscreenControl = new ymaps.control.FullscreenControl();
+                mainMap.controls.add(fullscreenControl);
+                getObjects('stations', 0);
+                getObjects('metro', 0);
+                //getObjects('streets', 0);
+                //getObjects('streets', 1);
+                //getObjects('streets', 2);
+                //getObjects('streets', 3);
+                getObjects('house', 1);
+                //getObjects('house', 2);
+                //getObjects('house', 3);
+                getObjects('routes', 4);
+            }
+
+            jQuery(document).ready(function(){
+                ymaps.ready(initMap);
+            });
+
+            function renderGeoJson(response, collectionName, version){
+                let color = colors[version];
+                if(typeof(collectionName) === 'undefined'){
+                    collectionName = 'default';
+                }
+                if(typeof(collections[collectionName]) === 'undefined'){
+                    collections[collectionName] = [];
+                }
+                if(typeof(collections[collectionName][version]) === 'undefined'){
+                    collections[collectionName][version] = new ymaps.GeoObjectCollection(null, {});
+                }
+                for(let i = 0; i < response.features.length; i++){
+                    var hashstring = '';
+                    let feature = response.features[i];
+                    let type = feature.geometry.type;
+                    let h = '';
+                    switch(type){
+                        case 'MultiPolygon':
+                            let polygonCoords = feature.geometry.coordinates;
+                            for(let p = 0; p < polygonCoords.length; p++){
+                                let coords = [];
+                                for(let c = 0; c < polygonCoords[p][0].length; c++){
+                                    let lat = polygonCoords[p][0][c][1];
+                                    let lon = polygonCoords[p][0][c][0];
+                                    hashstring += lat.toString() + ' ' + lon.toString() + ' ';
+                                    coords.push([
+                                        lat,
+                                        lon
+                                    ]);
+                                }
+                                h = stringToHash(hashstring);
+                                if(!hashes.includes(h)){
+                                    hashes.push(h);
+                                    object = new ymaps.Polygon(
+                                        [coords], 
+                                        {
+                                            balloonContent: feature.properties.Type
+                                        }, 
+                                        {
+                                            strokeColor: color,
+                                            fillColor: color,
+                                            fillOpacity: 0.8,
+                                        }
+                                    ); 
+                                    collections[collectionName][version].add(object);
+                                }
+                            }
+                        break;
+                        case 'LineString':
+                            let lineCoords = feature.geometry.coordinates;
+                            let coords = [];
+                            for(let c = 0; c < lineCoords.length; c++){
+                                let lat = lineCoords[c][1];
+                                let lon = lineCoords[c][0];
+                                hashstring += lat.toString() + ' ' + lon.toString() + ' ';
+                                coords.push([
+                                    lat,
+                                    lon
+                                ]);
+                            }
+                            h = stringToHash(hashstring);
+                            if(!hashes.includes(h)){
+                                hashes.push(h);
+                                object = new ymaps.Polyline(
+                                    coords, 
+                                    {
+                                        balloonContent: feature.properties.ROAD_CATEG,
+                                        collection : collectionName,
+                                        version : version,
+                                    }, 
+                                    {
+                                        strokeColor: color,
+                                        strokeOpacity: 0.01,
+                                        strokeWidth: 4,
+                                    }
+                                ); 
+                                collections[collectionName][version].add(object);
+                                object.events.add('click', function (e) {
+                                    console.log(e);
+                                    if (!e.get('target').getGeoObjects) {
+                                        cname = e.get('target').properties.get('collection');
+                                        cversion = e.get('target').properties.get('version');
+                                        e.preventDefault();
+                                        collections[collectionName][version].remove(e.get('target'));
+                                    }
+                                });
+                            }
+
+                        break;
+                        case 'Point':
+                            let lat = feature.geometry.coordinates[1];
+                            let lon = feature.geometry.coordinates[0];
+                            hashstring += lat.toString() + ' ' + lon.toString() + ' ';
+                            h = stringToHash(hashstring);
+                            if(!hashes.includes(h)){
+                                hashes.push(h);
+                                object = new ymaps.Placemark([lat, lon], {
+                                    balloonContent: feature.properties.Name
+                                }, {
+                                    preset: 'islands#circleIcon',
+                                    iconColor: color
+                                });
+                                collections[collectionName][version].add(object);
+                                hashes.push(stringToHash(hashstring));
+                            }
+                            break;
+                    }
+
+                }
+                mainMap.geoObjects.add(collections[collectionName][version]);
+                mainMap.setBounds(mainMap.geoObjects.getBounds());
+            }
+
+            function getObjects(type, version){
+                let url = '/hackai/api/';
+                url += '?type=' + type;
+                if(typeof(version) === 'undefined'){
+                    version = 0;
+                }
+                url += '&version='+version;
+                jQuery.get(url, {}, function(response){
+                    renderGeoJson(response, type, version);
+                });
+            }
+        </script>
+    </body>
 </html>

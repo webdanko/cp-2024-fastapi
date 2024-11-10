@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<!--
+Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+Click nbfs://nbhost/SystemFileSystem/Templates/Other/html.html to edit this template
+-->
+<html>
+    <head>
+        <title>Social gravity map</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+        <script src="//ajax.googleapis.com/ajax/libs/d3js/7.9.0/d3.min.js"></script>
+        <style>
+            html, body {
+                margin: 0;
+                padding: 0;
+                font-family: system-ui, -apple-system, /* Firefox supports this but not yet `system-ui` */ 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+            }
+            .full-screen-container {
+                width:100%;
+                height: 100vh;
+            }
+            .panel {
+                display: flex;
+            }
+            .panel button {
+                margin: auto;
+                width: 50%;
+                padding: 1rem;
+            }
+            input {
+                background: transparent;
+                border: none;
+            }
+            .data {
+                position: absolute;
+               
+                padding: 10px;
+            }
+            .data.left {
+                left: 0;
+                top: 0;
+                text-align: left;
+            }
+            .data.right {
+                right: 0;
+                top: 0;
+                text-align: right;
+            }
+            .delta {
+                font-weight: 600;
+            }
+            .data input {
+                width: 40px;
+            }
+            button {
+                text-transform: uppercase;
+            }
+            .btn-0 {
+                background: #4caf50;
+                border: none;
+                color: #fff;
+            }
+            .btn-1 {
+                background: #af4c4c;
+                border: none;
+                color: #fff;
+            }
+        </style>
+            <script>
+                var datum = [];
+                function save(state){
+                    let row = {
+                        angle : jQuery('[name="angle"]').val(),
+                        eff : jQuery('[name="eff"]').val(),
+                        type : jQuery('[name="type"]').val(),
+                        state : state,
+                    };
+                    datum.push(row)
+                    return false;
+                }
+                
+                function renderPositions(selector, data, pointType){
+                    let w = 600;
+                    let h = 600;
+                    let minX = 0
+                    let maxX = 180;
+                    let minY = 0;
+                    let maxY = 180;
+                    let margin = 2;
+
+                    let container = jQuery(selector);
+                    container.html('');
+                    let svg = d3.select(selector).append("svg")
+                            .attr("width", w)
+                            .attr("height", h)
+                            .style("position", "relative");
+
+                    let defs = svg.append('defs')
+                    let gradient = defs.append('linearGradient')
+                            .attr("id", "grad")
+                            .attr("gradientUnits", "userSpaceOnUse")
+                            .attr("x1", 0)
+                            .attr("y1", 0)
+                            .attr("x2", 0)
+                            .attr("y2", h);
+                    let colors = {
+                        '0%' : 'rgb(50,255,0)',
+                        '50%' : 'rgb(211,209,1)',
+                        '100%' : 'rgb(255,63,63)',
+                    };
+
+                    jQuery.each(colors, function(k,v){
+                        gradient.append('stop')
+                            .attr('offset', k)
+                            .style('stop-color', v)
+                    })
+
+                    let g = svg.append("g")
+                            .attr("transform", "translate(" + margin + "," + margin + ")")
+                            .append("g")
+
+                    let x = d3.scaleLinear()
+                            .domain([minX, maxX])
+                            .range([0, w-margin*2]);
+
+                    let y = d3.scaleLinear()
+                            .domain([minY, maxY])
+                            .range([0, h-margin*2]);
+
+                    let line = d3.line()
+                            .curve(d3.curveLinear)
+                            .x(d => x(d.x))
+                            .y(d => y(d.y));
+
+                    g.append("path")
+                        .datum(data)
+                        .attr("fill", "none")
+                        .attr("stroke", "url(#grad)")
+                        .attr("stroke-width", 8)
+                        .attr("stroke-linejoin", "round")
+                        .attr("stroke-linecap", "round")
+                        .attr("d", line);
+                
+                    let dataForward = [
+                        data[0], data[data.length - 1]
+                    ];
+                    
+                    g.append("path")
+                        .datum(dataForward)
+                        .attr("fill", "none")
+                        .attr("stroke", "#0000FF")
+                        .attr("stroke-opacity", 0.1)
+                        .attr("stroke-width", 6)
+                        .attr("stroke-linejoin", "round")
+                        .attr("stroke-linecap", "round")
+                        .attr("stroke-dasharray", "4 1")
+                        .attr("d", line);
+                    
+                    g.append("circle")
+                        .attr("fill", "#FF0000")
+                        .attr("cx", x(data[data.length - 1].x))
+                        .attr("cy", y(data[data.length - 1].y))
+                        .attr("r", 10)
+                
+                    let anchor = 'middle';
+                    let delta = 20;
+                    if(jQuery('[name="angle"]').val() < 0){
+                        anchor = 'start';
+                    } else if(jQuery('[name="angle"]').val() > 0){
+                        anchor = 'end';
+                    }
+                    g.append("text")
+                        .attr("fill", "#FF0000")
+                        .attr("x", x(data[data.length - 1].x))
+                        .attr("y", y(data[data.length - 1].y) - 20)
+                        .style("text-anchor", anchor)
+                        .style("font-weight", 600)
+                        .style("text-transform", "uppercase")
+                        .text(pointType)
+
+                }
+                function getLineLen(d1, d0){
+                    return Math.hypot(d1.x - d0.x, d1.y - d0.y)
+                }
+                
+                function randomizeData(angle1, angle2){
+                    let types = [
+                        'Школа',
+                        'Детский сад',
+                        'Автобусная остановка',
+                        'Магазин',
+                    ];
+                    let data = [
+                        {
+                            x : 90,
+                            y : 180
+                        },
+                    ];
+                    let minR = 80;
+                    let maxR = 150;
+                    let totalR = 170;
+                    let R =  Math.floor(Math.random() * (maxR - minR) + minR);
+                    data.push({
+                        x : 90,
+                        y : 180 - R,
+                    });
+
+                    let type = Math.floor(Math.random() * types.length);
+                    if(typeof(angle1) === 'undefined'){
+                        max = 160;
+                        min = 5;
+                        sign = Math.random() > 0.5 ? 1 : -1;
+                        angle1 = sign * Math.floor(Math.random() * (max - min) + min);
+                    }
+                    jQuery('[name="angle"]').val(angle1);
+                    let radians1 = (angle1 - 90) * (Math.PI / 180);
+                    
+                    let R1 = totalR - R;
+                    let point = {}
+                    let sin1 = Math.sin(radians1);
+                    let cos1 = Math.cos(radians1);
+                    point.x = R1 * cos1 + 90,
+                    point.y = 180 - R - (R1 * sin1)
+                    data.push(point);
+                    
+                    if(typeof(angle2) !== 'undefined'){
+                        point = {}
+                        let radians2 = (angle2 - 90) * (Math.PI / 180);
+                        let R2 = 30;
+                        let sin2 = Math.sin(radians2);
+                        let cos2 = Math.cos(radians2);
+                        point.x = R2 * cos2 + 90,
+                        point.y = R2 * sin2 + 90
+                        data.push(point);
+                    }
+                    
+                    let forward = getLineLen(data[data.length - 1], data[0])
+                    jQuery('[name="forward"]').val(forward.toFixed(1))
+                    
+                    let path = 0;
+                    for(let i = 1; i < data.length; i++){
+                        path +=  getLineLen(data[i], data[i-1]);
+                    }
+                    jQuery('[name="path"]').val(path.toFixed(1));
+                    let eff  = path / forward;
+                    jQuery('[name="eff"]').val(eff.toFixed(2));
+                    
+                    jQuery('[name="delta"]').val((path - forward).toFixed(1));
+                    
+                    renderPositions('.svg-container', data, types[type]);
+                    jQuery('[name="type"]').val(type)
+                    return false;
+                }
+            </script>
+    </head>
+    <body>
+        <div class="full-screen-container">
+            <div class="container" style="height: 600px; width: 100%; text-align: center;">
+                <div class="svg-container" style="height: 600px; width: 600px; margin: 0 auto;">
+            </div>
+            <div class="data left">
+                <div class="delta">
+                    <label>По тротуару путь длиннее на:</label>
+                    <input name="delta">
+                    <span>метров</span>
+                </div>
+            </div>
+            <div class="data right">
+                <div>
+                    <label>Угол:</label>
+                    <input name="angle" type="number">
+                </div>
+                <div>
+                    <label>Путь по прямой (м):</label>
+                    <input name="forward">
+                </div>
+                <div>
+                    <label>Путь по тротуару (м):</label>
+                    <input name="path">
+                </div>
+                <div>
+                    <label>Соотношение кратчайшего расстояния к пути:</label>
+                    <input name="eff">
+                    <input type="hidden" name="type">
+                </div>
+            </div>
+            <div class="panel">
+                <button class="btn-0" onclick="save(0);randomizeData();">
+                    Пойду по тротуару
+                </button>
+                <button class="btn-1" onclick="save(1);randomizeData()">
+                    Срежу
+                </button>
+            </div>
+            <script>
+                randomizeData();
+            </script>
+        </div>
+    </body>
+</html>
